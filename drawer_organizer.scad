@@ -8,6 +8,8 @@ width_top = 5;
 connector_length = 18;
 // use overhang for border pieces, in case your (side-) walls are not fully vertical
 border_overhang = 13;
+// adds a little bump on the connector, that locks pieces in the right position
+snap_connection_size = 1;
 
 /* [Divider Settings] */
 divider_length = 72;
@@ -214,30 +216,43 @@ module fitting(male=true, border=false) {
     gap_top = male ? gap_top : 0;
     connector_length = radius_bottom;
     // For crazy people, that choose width_top > width_bottom. Otherwise pieces
-    // cannot be sticked together. Such a design actually looks quite nice ;)
+    // cannot be stuck together. Such a design actually looks quite nice ;)
     radius_top = radius_top <= radius_bottom ? radius_top : radius_bottom;
     radius_top_gap = radius_top+(radius_bottom-radius_top)*gap_top/height_linear;
     skew = (radius_bottom-radius_top)/2 + border_overhang;
     radius_bottom = border ? (radius_top+radius_bottom)/2 : radius_bottom;
+    // snap connection variables
+    snap_height_factor = 0.2;
+    snap_height = height_linear * snap_height_factor;
+    snap_radius = 0.3 * (radius_bottom * (1-snap_height_factor) +
+                         radius_top * snap_height_factor) +
+                  snap_connection_size;
     multmatrix(m=[
         [1,0,border?skew/height:0,border?-skew:0],
         [0,1,0,0],
         [0,0,1,0],
         [0,0,0,1]]) {
-        linear_extrude(height=height_linear-gap_top, scale=radius_top_gap/radius_bottom) {
-            polygon([
-                [-0.3*radius_bottom+gap, 0],
-                [0.3*radius_bottom-gap, 0],
-                [0.5*radius_bottom-gap, connector_length],
-                [-0.5*radius_bottom+gap, connector_length]
-            ]);
-            translate([0,connector_length]) {
-                circle(r=0.6*radius_bottom-gap);
-                // add "air channel" for female piece
-                if (!male)
-                    translate([-0.1*radius_bottom,0])
-                        square([0.2*radius_bottom, radius_bottom]);
+        union() {
+            linear_extrude(height=height_linear-gap_top, scale=radius_top_gap/radius_bottom) {
+                polygon([
+                    [-0.3*radius_bottom+gap, 0],
+                    [0.3*radius_bottom-gap, 0],
+                    [0.5*radius_bottom-gap, connector_length],
+                    [-0.5*radius_bottom+gap, connector_length]
+                ]);
+                translate([0,connector_length]) {
+                    circle(r=0.6*radius_bottom-gap);
+                    // add "air channel" for female piece
+                    if (!male)
+                        translate([-0.1*radius_bottom,0])
+                            square([0.2*radius_bottom, radius_bottom]);
+                }
             }
+            // snap connection
+            if (snap_connection_size > 0)
+                translate([0,0,snap_height])
+                    rotate([-90,0,0])
+                        cylinder(h=connector_length, r1=snap_radius - gap, r2=0.8*snap_radius - gap);
         }
     }
 }
@@ -396,22 +411,40 @@ module divider_bend(length=100, distance=bend_distance, radius_factor=bend_radiu
     length_round = abs(distance) >= 2*radius ? radius : abs(sin(angle))*radius;
     length_start = 0.5*(length-2*length_round);
     assert(length >= 2*length_round, "divider_bend: length too short or radius too big");
+    epsilon_angle = $fa * sign(angle);
     difference() {
         union() {
+            // initial straight part and final straight part
             if (length_start > 0) {
                 profile(length_start);
                 translate([distance,length_start-length])
                     profile(length_start);
             }
+            // bend profile in one direction
             translate([0,-length_start])
                 rotate([0,0,180])
                     profile_round(radius=radius*sign(angle), angle=angle);
+            // bend profile in other direction
             translate([distance, length_start-length])
                 profile_round(radius=radius*sign(angle), angle=angle);
-            if (length_ortho > 0) {
-                translate([angle>0?radius:-length_ortho-radius,-0.5*length])
-                    rotate([0,0,90])
-                        profile(length_ortho);
+            // straight middle part
+            // In case the middle part is not needed, this is a tiny little glue piece
+            // between the previous two parts. It fixes an issue with broken geometry, that
+            // is caused by rounding errors. Openscad does not like to union pieces, that
+            // only touch. So far this is the only place where I experienced actual errors
+            // when union exactly touching pieces.
+            hull() {
+                translate([0,-length_start])
+                    rotate([0,0,180])
+                        translate([-radius*sign(angle),0,0])
+                            rotate([0,0,angle])
+                                translate([radius*sign(angle),0,0])
+                                    profile_round(radius=radius*sign(angle), angle=-epsilon_angle);
+                translate([distance, length_start-length])
+                    translate([-radius*sign(angle),0,0])
+                        rotate([0,0,angle])
+                            translate([radius*sign(angle),0,0])
+                                profile_round(radius=radius*sign(angle), angle=-epsilon_angle);
             }
         }
         rotate([0,0,180])

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create STL files with single objects from drawer_organizer.scad."""
+"""Create STL files with single parts from drawer_organizer.scad."""
 import itertools
 import subprocess
 import os
@@ -9,8 +9,9 @@ EXECUTABLE = "openscad-nightly"
 OUTPUT_TYPE = "stl" # openscad also supports "amf", "3mf" and others
 
 base_length = 18
-divider_lengths = list(range(base_length, 11*base_length, base_length))
+divider_lengths = list(range(2*base_length, 11*base_length, base_length))
 bend_distances = list(range(base_length, 6*base_length, base_length))
+border_overhangs = [0, 7, 13]
 parts = {
     #"connector_all": {},
     "connector_zero": {},
@@ -25,7 +26,7 @@ parts = {
     "divider": {
         "divider_length": divider_lengths},
     "divider_lowered": {
-        "divider_length": divider_lengths[3:]},
+        "divider_length": divider_lengths[2:]},
     # can easily be created by mirroring in the slicer
     #"divider_bend_right": {
     #    "divider_length": divider_lengths,
@@ -34,19 +35,20 @@ parts = {
         "divider_length": divider_lengths,
         "bend_distance": bend_distances},
     #"connector_border_all": {},
-    "connector_zero_border": {"border_overhang": [0, 13]},
-    "connector_straight_border": {"border_overhang": [0, 13]},
-    "connector_t_border": {"border_overhang": [0, 13]},
-    "connector_t_round_border": {"border_overhang": [0, 13]},
-    "connector_corner_edgy_border": {"border_overhang": [0, 13]},
-    "connector_corner_border": {"border_overhang": [0, 13]},
-    "connector_corner_round_border": {"border_overhang": [0, 13]},
+    "connector_zero_border": {"border_overhang": border_overhangs},
+    "connector_straight_border": {"border_overhang": border_overhangs},
+    "connector_t_border": {"border_overhang": border_overhangs},
+    "connector_t_round_border": {"border_overhang": border_overhangs},
+    "connector_corner_edgy_border": {"border_overhang": border_overhangs},
+    "connector_corner_border": {"border_overhang": border_overhangs},
+    "connector_corner_round_border": {"border_overhang": border_overhangs},
     "divider_border": {
         "divider_length": divider_lengths,
-        "border_overhang": [0, 13]},
+        "border_overhang": border_overhangs},
 }
 
 designs = [
+    {"height": 25},
     {"height": 40},
     {"height": 50},
     {"height": 60},
